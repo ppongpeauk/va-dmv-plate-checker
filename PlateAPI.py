@@ -6,6 +6,10 @@ class PlateLengthError(Exception):
     pass
 
 
+class PlateAPIError(Exception):
+    pass
+
+
 defaults = {
     # cookie_url gets accessed first to retrieve a valid session ID
     "cookie_url": "https://transactions.dmv.virginia.gov/dmvnet/plate_purchase/select_plate.asp",
@@ -19,8 +23,8 @@ defaults = {
         "Content-Length": "286",
         "Content-Type": "application/x-www-form-urlencoded",
     },
-    "payload": "TransType=INQ&TransID=RESINQ&ReturnPage=%2Fdmvnet%2Fplate_purchase%2Fs2end.asp&HelpPage=&Choice=A&PltNo={plate}&HoldISA=N&HoldSavePltNo=&HoldCallHost=&NumCharsInt=6&CurrentTrans=plate_purchase_reserve&PltType=APA2&PltNoAvail={plate}&PersonalMsg=Y&Let1=a&Let2=a&Let3=a&Let4=a&Let5=a&Let6=a",
-    "max_plate_length": 7,
+    "payload": "TransType=INQ&TransID=RESINQ&ReturnPage=%2Fdmvnet%2Fplate_purchase%2Fs2end.asp&HelpPage=&Choice=A&PltNo={plate}&HoldISA=N&HoldSavePltNo=&HoldCallHost=&NumCharsInt=6&CurrentTrans=plate_purchase_reserve&PltType=PAVL&PltNoAvail={plate}&PersonalMsg=Y&Let1=a&Let2=a&Let3=a&Let4=a&Let5=a&Let6=a",
+    "max_plate_length": 8,
 }
 
 
@@ -57,7 +61,7 @@ class API:
 
         # Check for plate length, VA plates typically don't exceed 7 characters
         if not 0 < len(plate) <= self.max_plate_length:
-            raise PlateLengthError
+            raise PlateLengthError("Plate length is invalid")
 
         response = self.session.post(
             self.url,
@@ -68,9 +72,25 @@ class API:
 
         soup = bs4.BeautifulSoup(
             response.text, "lxml"
-        )  # lxml run faster than html.parser!
+        )  # lxml runs faster than html.parser!
+
+        # The message we're looking for is contained in a <font> tag with a color attribute
+        # This is the only <font> tag with a color attribute on the page
         search = soup.find_all(
-            lambda tag: tag.name == "font" and "congratulations" in tag.text.lower()
+            lambda tag: tag.name == "font" and tag.attrs.get("color")
         )
 
-        return len(search) > 0
+        if len(search) == 0:
+            # Raise an exception if we can't find the <font> tag
+            raise PlateAPIError("Could not find availability tag")
+        else:
+            message = search[0].text
+            is_available = "congratulations" in message.lower()
+            is_reserved = "reserved" in message.lower()
+            result = {
+                "plate_number": plate,
+                "available": is_available,
+                "reserved": is_reserved,
+                "message": message,
+            }
+            return result
