@@ -1,10 +1,12 @@
 # va-dmv-plate-checker
-A simple wrapper library to check if a Virginia DMV license plate number is available for purchase. Built using BeautifulSoup and Requests.
+A simple wrapper library to check if a Virginia DMV license plate number is available for purchase. Built using BeautifulSoup, lxml, and requests.
 
 Demo files are included in the repository.
 
 ## Installation
 ```bash
+python -m venv venv 
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
